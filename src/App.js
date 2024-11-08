@@ -1,68 +1,67 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import { Button, TextField, List, ListItem, ListItemText, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { View, Text, Button, TextInput, FlatList, Alert, StyleSheet } from 'react-native';
 
-const App = () => {
-  const [notes, setNotes] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [currentNote, setCurrentNote] = useState({ id: '', title: '' });
-  const API_URL = 'https://jsonplaceholder.typicode.com/posts';
+const TimerApp = () => {
+  const [timers, setTimers] = useState([]);
+
+  const addTimer = (inputTime = 60) => {
+    if (timers.length < 5) {
+      setTimers([...timers, { id: Date.now(), timeLeft: inputTime, isRunning: false, inputTime }]);
+    } else {
+      Alert.alert('Limit Reached', 'You can only add up to 5 timers.');
+    }
+  };
+
+  const startTimer = (id) => {
+    setTimers(timers.map(timer => timer.id === id ? { ...timer, isRunning: true } : timer));
+  };
+
+  const pauseTimer = (id) => {
+    setTimers(timers.map(timer => timer.id === id ? { ...timer, isRunning: false } : timer));
+  };
+
+  const resetTimer = (id) => {
+    setTimers(timers.map(timer => timer.id === id ? { ...timer, timeLeft: timer.inputTime, isRunning: false } : timer));
+  };
 
   useEffect(() => {
-    axios.get(API_URL).then((res) => setNotes(res.data.slice(0, 10))); // Load only 10 notes
-  }, []);
+    const interval = setInterval(() => {
+      setTimers(timers => timers.map(timer => {
+        if (timer.isRunning && timer.timeLeft > 0) {
+          return { ...timer, timeLeft: timer.timeLeft - 1 };
+        }
+        if (timer.timeLeft === 0 && timer.isRunning) {
+          Alert.alert('Timer Complete', `Timer ${timer.id} has finished.`);
+          return { ...timer, isRunning: false };
+        }
+        return timer;
+      }));
+    }, 1000);
 
-  const handleSave = () => {
-    if (currentNote.id) {
-      axios.put(`${API_URL}/${currentNote.id}`, currentNote)
-        .then(() => setNotes(notes.map(n => (n.id === currentNote.id ? currentNote : n))));
-    } else {
-      axios.post(API_URL, currentNote).then((res) => setNotes([...notes, res.data]));
-    }
-    setOpen(false);
-    setCurrentNote({ id: '', title: '' });
-  };
-
-  const handleDelete = (id) => {
-    axios.delete(`${API_URL}/${id}`).then(() => setNotes(notes.filter(n => n.id !== id)));
-  };
-
-  const openDialog = (note = { id: '', title: '' }) => {
-    setCurrentNote(note);
-    setOpen(true);
-  };
+    return () => clearInterval(interval);
+  }, [timers]);
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Note Taking App</h2>
-      <Button variant="contained" onClick={() => openDialog()}>Add Note</Button>
-      <List>
-        {notes.map((note) => (
-          <ListItem key={note.id}>
-            <ListItemText primary={note.title} />
-            <Button onClick={() => openDialog(note)}>Edit</Button>
-            <Button onClick={() => handleDelete(note.id)}>Delete</Button>
-          </ListItem>
-        ))}
-      </List>
-
-      <Dialog open={open} onClose={() => setOpen(false)}>
-        <DialogTitle>{currentNote.id ? 'Edit Note' : 'Add Note'}</DialogTitle>
-        <DialogContent>
-          <TextField
-            label="Title"
-            fullWidth
-            value={currentNote.title}
-            onChange={(e) => setCurrentNote({ ...currentNote, title: e.target.value })}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={handleSave}>Save</Button>
-        </DialogActions>
-      </Dialog>
-    </div>
+    <View style={styles.container}>
+      <FlatList
+        data={timers}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item }) => (
+          <View style={styles.timer}>
+            <Text>{`Time Left: ${item.timeLeft} seconds`}</Text>
+            <Button title={item.isRunning ? "Pause" : "Start"} onPress={() => item.isRunning ? pauseTimer(item.id) : startTimer(item.id)} />
+            <Button title="Reset" onPress={() => resetTimer(item.id)} />
+          </View>
+        )}
+      />
+      <Button title="Add Timer" onPress={() => addTimer()} />
+    </View>
   );
 };
 
-export default App;
+const styles = StyleSheet.create({
+  container: { flex: 1, padding: 20, backgroundColor: '#fff' },
+  timer: { margin: 10, padding: 10, backgroundColor: '#f9f9f9', borderRadius: 5 }
+});
+
+export default TimerApp;
